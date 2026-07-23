@@ -82,6 +82,7 @@ import {
   type ValueType,
   isManagedRegistrationMerge,
 } from './types/forecast';
+import ubeLogo from './assets/logoube.png';
 
 const lazyRechart = (name: string) => lazy(async () => {
   const module = await import('recharts');
@@ -3729,22 +3730,8 @@ export default function App() {
       <nav className="relative z-50 flex h-14 shrink-0 items-center justify-between overflow-visible bg-[#007ABE] px-5 shadow-sm">
         <div className="flex min-w-0 items-center gap-5 overflow-visible">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-[56px] shrink-0 items-center justify-center rounded-md bg-white shadow-sm" aria-label="UBE">
-              <svg viewBox="0 0 120 42" className="h-7 w-[52px]" role="img" aria-hidden="true">
-                <text
-                  x="57"
-                  y="31"
-                  fill="#2F86C5"
-                  fontFamily="Arial Black, Arial, sans-serif"
-                  fontSize="34"
-                  fontStyle="italic"
-                  fontWeight="900"
-                  letterSpacing="-4"
-                  textAnchor="middle"
-                >
-                  UBE
-                </text>
-              </svg>
+            <div className="flex h-8 w-auto shrink-0 items-center justify-center rounded-md bg-white px-2 shadow-sm">
+              <img src={ubeLogo} alt="UBE" className="h-6 w-auto" />
             </div>
             <span className="text-white font-bold tracking-tight text-base uppercase whitespace-nowrap">SalesNexus</span>
             {appConfig ? (

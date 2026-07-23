@@ -421,6 +421,20 @@ function shiftMonthKey(month: string, delta: number): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+interface CarrySnapshot {
+  carryInETD: number;
+  carryOutETD: number;
+  carryInLoading: number;
+  carryOutLoading: number;
+}
+
+// Carry columns show a single snapshot month per registration: the current
+// month before the 26th (order cutoff), next month from the 26th onward.
+function getCarrySnapshotMonth(now = new Date()): string {
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return now.getDate() < 26 ? currentMonthKey : shiftMonthKey(currentMonthKey, 1);
+}
+
 function resolveApiErrorMessage(primary: unknown, secondary: unknown, fallback: string): string {
   if (secondary instanceof ApiError) return secondary.message;
   if (primary instanceof ApiError) return primary.message;
@@ -657,6 +671,7 @@ export default function App() {
   const [forecastAuditVersion, setForecastAuditVersion] = useState(0);
   const [inventoryByRegistrationId, setInventoryByRegistrationId] = useState<Map<string, InventoryRow>>(new Map());
   const [isInventoryLoading, setIsInventoryLoading] = useState(false);
+  const [carrySnapshotByRegistrationId, setCarrySnapshotByRegistrationId] = useState<Map<string, CarrySnapshot>>(new Map());
   const [inventoryCommitPreviewOpen, setInventoryCommitPreviewOpen] = useState(false);
   const [commitEmailPreviewOpen, setCommitEmailPreviewOpen] = useState(false);
   const [commitEmailPreviewBatches, setCommitEmailPreviewBatches] = useState<EmailBatchPreview[]>([]);
@@ -668,6 +683,7 @@ export default function App() {
   const mergedRegistrationCacheRef = useRef(new Map<string, {
     registration: Registration;
     inventory?: InventoryRow;
+    carry?: CarrySnapshot;
     merged: Registration;
   }>());
   const [snapshotStatus, setSnapshotStatus] = useState<SnapshotStatus | null>(null);
@@ -1112,6 +1128,29 @@ export default function App() {
       if (pendingInventoryRequestIdsRef.current.size === 0) setIsInventoryLoading(false);
     }
   }, [mergeInventoryRows]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const targetMonth = getCarrySnapshotMonth();
+    api.actuals.list(targetMonth, targetMonth).then(rows => {
+      if (cancelled) return;
+      const map = new Map<string, CarrySnapshot>();
+      rows.forEach(row => {
+        map.set(row.registrationId, {
+          carryInETD: row.carryInETD,
+          carryOutETD: row.carryOutETD,
+          carryInLoading: row.carryInLoading,
+          carryOutLoading: row.carryOutLoading,
+        });
+      });
+      setCarrySnapshotByRegistrationId(map);
+    }).catch(error => {
+      console.error('[carry snapshot] failed to load:', error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleRefreshSnapshot = useCallback(async () => {
     if (isRefreshingSnapshot) return;
@@ -2596,28 +2635,38 @@ export default function App() {
       const inventory =
         inventoryByRegistrationId.get(registration.id) ??
         inventoryByMaterialKey.get(`${registration.plantCode}|${registration.materialCode}`);
-      if (!inventory) return registration;
+      const carry = carrySnapshotByRegistrationId.get(registration.id);
+      if (!inventory && !carry) return registration;
       const cached = mergedRegistrationCacheRef.current.get(registration.id);
-      if (cached?.registration === registration && cached?.inventory === inventory) {
+      if (cached?.registration === registration && cached?.inventory === inventory && cached?.carry === carry) {
         return cached.merged;
       }
       const merged = {
         ...registration,
-        inventoryA0Qty: inventory.a0Qty,
-        inventoryNonA0Qty: inventory.nonA0Qty,
-        inventoryWaitJudgeQty: inventory.waitJudgeQty,
-        inventoryOgQty: inventory.ogQty,
-        inventoryYoQty: inventory.yoQty,
-        inventoryDate: inventory.inventoryDate,
+        ...(inventory ? {
+          inventoryA0Qty: inventory.a0Qty,
+          inventoryNonA0Qty: inventory.nonA0Qty,
+          inventoryWaitJudgeQty: inventory.waitJudgeQty,
+          inventoryOgQty: inventory.ogQty,
+          inventoryYoQty: inventory.yoQty,
+          inventoryDate: inventory.inventoryDate,
+        } : {}),
+        ...(carry ? {
+          carryInETD: carry.carryInETD,
+          carryOutETD: carry.carryOutETD,
+          carryInLoading: carry.carryInLoading,
+          carryOutLoading: carry.carryOutLoading,
+        } : {}),
       };
       mergedRegistrationCacheRef.current.set(registration.id, {
         registration,
         inventory,
+        carry,
         merged,
       });
       return merged;
     }),
-    [inventoryByMaterialKey, inventoryByRegistrationId, registrations]
+    [inventoryByMaterialKey, inventoryByRegistrationId, carrySnapshotByRegistrationId, registrations]
   );
 
   const filteredRegistrations = useMemo(() => {

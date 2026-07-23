@@ -37,7 +37,7 @@ export function dedupeFilterOptions(values: Iterable<string>): string[] {
 
 export function getRegistrationFieldValue(reg: Registration, key: string): string {
   const value = reg[key as keyof Registration];
-  if (key.startsWith('inventory') && typeof value === 'number') {
+  if ((key.startsWith('inventory') || key.startsWith('carry')) && typeof value === 'number') {
     return value.toLocaleString(undefined, {
       minimumFractionDigits: 3,
       maximumFractionDigits: 3,

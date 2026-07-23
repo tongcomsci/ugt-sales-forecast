@@ -17,6 +17,10 @@ const cellStyles: Partial<Record<RegColumnKey, string>> = {
   inventoryWaitJudgeQty: 'font-normal text-black justify-end',
   inventoryOgQty: 'font-normal text-black justify-end',
   inventoryYoQty: 'font-normal text-black justify-end',
+  carryInETD: 'font-normal text-black justify-end',
+  carryOutETD: 'font-normal text-black justify-end',
+  carryInLoading: 'font-normal text-black justify-end',
+  carryOutLoading: 'font-normal text-black justify-end',
 };
 
 function RegTableCellBase({

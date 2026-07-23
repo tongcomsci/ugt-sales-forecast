@@ -92,6 +92,7 @@ export type VersionedPreviewResult = {
     uniqueExcelKeys: number;
     groupedDuplicateKeys: number;
     skippedKeyGroups: number;
+    excludedQty?: number;
     amountMismatchWarnings: number;
     pricingPoliciesDetected?: number;
     unknownPricingPolicies?: number;
@@ -120,6 +121,7 @@ export type VersionedPreviewResult = {
     sourceSheet: string;
     reason: string;
     reasonCode: 'invalid_forecast_number' | 'excluded_plant';
+    qtyExcluded: number;
   }>;
   unmatchedRows: UnmatchedRowDiagnostic[];
   duplicateRegistrationMatches: Array<{
@@ -269,12 +271,14 @@ export async function buildVersionedImportPreview(
   const skippedKeyGroups = [...excelGroups.values()]
     .flatMap(group => {
       const primary = primarySourceEntry(group);
+      const qtyExcluded = group.forecastValues.reduce((sum, value) => sum + value, 0);
       const items: Array<{
         excelKeyForNoRegist: string;
         sourceRows: number[];
         sourceSheet: string;
         reason: string;
         reasonCode: 'invalid_forecast_number' | 'excluded_plant';
+        qtyExcluded: number;
       }> = [];
 
       if (isExcludedImportPlantKey(group.keyNoRegist)) {
@@ -284,6 +288,7 @@ export async function buildVersionedImportPreview(
           sourceSheet: primary.sourceSheet,
           reason: `Plant ${parseExcelKey(group.keyNoRegist).plant || 'excluded'} is excluded from import`,
           reasonCode: 'excluded_plant',
+          qtyExcluded,
         });
       } else if (isOutOfAppModeImportKey(group.keyNoRegist, group.businessUnit)) {
         items.push({
@@ -292,6 +297,7 @@ export async function buildVersionedImportPreview(
           sourceSheet: primary.sourceSheet,
           reason: 'Business unit is outside this application mode',
           reasonCode: 'excluded_plant',
+          qtyExcluded,
         });
       }
 
@@ -310,11 +316,15 @@ export async function buildVersionedImportPreview(
           sourceSheet: primary.sourceSheet,
           reason,
           reasonCode: 'invalid_forecast_number',
+          qtyExcluded,
         });
       }
 
       return items;
     });
+  const excludedQty = skippedKeyGroups
+    .filter(item => item.reasonCode === 'excluded_plant')
+    .reduce((sum, item) => sum + item.qtyExcluded, 0);
   const excludedPlantKeys = new Set(
     skippedKeyGroups
       .filter(item => item.reasonCode === 'excluded_plant')
@@ -636,6 +646,7 @@ export async function buildVersionedImportPreview(
       uniqueExcelKeys: excelGroups.size,
       groupedDuplicateKeys: duplicateExcelKeys.length,
       skippedKeyGroups: skippedKeyGroups.length,
+      excludedQty,
       amountMismatchWarnings: amountMismatchWarnings.length,
       pricingPoliciesDetected,
       unknownPricingPolicies,

@@ -124,6 +124,7 @@ export interface CurrentForecastImportPreview {
     createRecords: number;
     overwriteRecords: number;
     skippedKeyGroups?: number;
+    excludedQty?: number;
     hasPriceColumns?: boolean;
     hasAmountColumns?: boolean;
     pricingPoliciesDetected?: number;
@@ -190,6 +191,7 @@ export interface CurrentForecastImportPreview {
     sourceSheet?: string;
     reason: string;
     reasonCode: 'invalid_forecast_number' | 'excluded_plant';
+    qtyExcluded?: number;
   }>;
   existingDbConflicts: Array<{
     sourceRow: number;

@@ -978,6 +978,20 @@ function ImportPreviewModal({
                   <PreviewStat label="Invalid Numbers" value={summary.invalidNumericValues} variant={summary.invalidNumericValues > 0 ? 'danger' : 'neutral'} />
                   <PreviewStat label="Create" value={summary.createRecords ?? 0} variant="success" />
                   <PreviewStat label="Overwrite" value={summary.overwriteRecords ?? 0} variant={(summary.overwriteRecords ?? 0) > 0 ? 'warning' : 'neutral'} />
+                  {(summary.skippedKeyGroups ?? 0) > 0 && (
+                    <PreviewStat
+                      label="Skipped Keys"
+                      value={summary.skippedKeyGroups ?? 0}
+                      variant="danger"
+                    />
+                  )}
+                  {(summary.excludedQty ?? 0) > 0 && (
+                    <PreviewStat
+                      label="Excluded Qty (not saved)"
+                      value={summary.excludedQty ?? 0}
+                      variant="danger"
+                    />
+                  )}
                   {(summary.pricingPoliciesDetected ?? 0) > 0 && (
                     <PreviewStat
                       label="Pricing Policies"
@@ -1497,16 +1511,17 @@ function ImportValidationIssues({
         {skippedKeyGroups.length > 0 && (
           <ValidationIssueTable
             title="Skipped Keys"
-            subtitle="Blocking — invalid forecast numbers in month columns"
+            subtitle="Not saved to database — excluded plant/business unit keys are dropped entirely; invalid-number keys are imported only for their valid months"
             severity="error"
-            columns={['Sheet', 'Key', 'Rows', 'Reason']}
+            columns={['Sheet', 'Key', 'Rows', 'Qty', 'Reason']}
             rows={skippedKeyGroups.map(item => [
               formatSheetLabel(item.sourceSheet),
               item.excelKeyForNoRegist,
               item.sourceRows.join(', '),
+              (item.qtyExcluded ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 }),
               item.reason,
             ])}
-            wideColumns={[3]}
+            wideColumns={[4]}
           />
         )}
         {unmatchedTotal > 0 && (

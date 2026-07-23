@@ -30,7 +30,7 @@ type ManageEmailPanelProps = {
 };
 
 function makeTempId() {
-  return `temp-${globalThis.crypto.randomUUID()}`;
+  return globalThis.crypto.randomUUID();
 }
 
 function Avatar({ name }: Readonly<{ readonly name: string }>) {

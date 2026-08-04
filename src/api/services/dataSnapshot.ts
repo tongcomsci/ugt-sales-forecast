@@ -265,10 +265,6 @@ async function performRefresh() {
     ]);
     clearActualCaches();
     clearForecastSummaryCache();
-    const { syncCplActualPrices } = await import('./cplActualSync');
-    syncCplActualPrices().catch(syncError => {
-      console.error('[cplActual] sync after snapshot refresh failed:', syncError);
-    });
     // Keep FactForecast ↔ DimRegistration joins consistent (Power BI): re-point
     // forecast rows whose registration key disappeared from DimRegistration
     // (e.g. CRM topic rename / MainRegist moved to another row).

@@ -20,7 +20,6 @@ import { startSnapshotScheduler } from './api/services/dataSnapshot';
 import { startOverplanScheduler } from './api/services/overplanWarmup';
 import { ensureHrEmployeeCache } from './api/services/employeeEmail';
 import { ensureCustomerMasterCache } from './api/services/customerMaster';
-import { ensureCplActualPrices } from './api/services/cplActualSync';
 import { ensureRoleDefaults } from './api/services/appRoles';
 import { createAuthRouter, getAbsoluteAppUrl, normalizeBasePath, requireAuth } from './api/auth';
 import { appModeContext, sendAppConfig } from './api/middleware/appModeContext';
@@ -122,7 +121,6 @@ app.listen(PORT, () => {
   startOverplanScheduler();
   ensureHrEmployeeCache()
     .then(() => ensureCustomerMasterCache())
-    .then(() => ensureCplActualPrices())
     .then(() => ensureRoleDefaults())
     .catch(() => undefined);
 });

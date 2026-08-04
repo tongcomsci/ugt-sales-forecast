@@ -122,16 +122,3 @@ export async function getCplActualPriceCount(): Promise<number> {
   `;
   return Number(rows[0]?.cnt ?? 0);
 }
-
-/// Sync once when no Actual rows exist yet. Never throws.
-export async function ensureCplActualPrices(): Promise<CplActualSyncResult | null> {
-  try {
-    const count = await getCplActualPriceCount();
-    if (count > 0) return { ok: true, synced: count, source: 'existing' };
-    return await syncCplActualPrices();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn('[cplActual] ensureCplActualPrices failed:', message);
-    return { ok: false, synced: 0, source: ACTUAL_SALES_VIEW, error: message };
-  }
-}

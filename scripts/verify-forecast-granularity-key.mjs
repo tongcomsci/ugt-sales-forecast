@@ -13,7 +13,7 @@
  * stay useful in CI.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from './readSource.mjs';
 import 'dotenv/config';
 
 // --- 1. every MERGE into forecast_values must key on granularity ------------
@@ -25,7 +25,7 @@ const mergeSources = [
 
 let mergeBlocksChecked = 0;
 for (const file of mergeSources) {
-  const sql = readFileSync(file, 'utf8');
+  const sql = readSource(file);
   // Each MERGE runs from the MERGE keyword to its first WHEN clause.
   const blocks = sql.matchAll(
     /MERGE\s+(?:\[dbo\]\.\[forecast_values\]|dbo\.forecast_values)[\s\S]*?WHEN\s+MATCHED/gi
@@ -47,7 +47,7 @@ assert.ok(
 );
 
 // --- 2. the Prisma model must declare granularity in its id ----------------
-const schema = readFileSync('prisma/schema.prisma', 'utf8');
+const schema = readSource('prisma/schema.prisma');
 const model = schema.slice(schema.indexOf('model ForecastValue'));
 const idLine = model.slice(model.indexOf('@@id')).split('\n')[0];
 assert.match(

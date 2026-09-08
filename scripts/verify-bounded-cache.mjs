@@ -4,6 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { pruneCache } from '../src/api/services/boundedCache.ts';
+import { readSource } from './readSource.mjs';
 
 const future = () => Date.now() + 60_000;
 const past = () => Date.now() - 1;
@@ -42,7 +43,6 @@ pruneCache(zero, 0);
 assert.equal(zero.size, 0, 'maxEntries 0 must clear the cache');
 
 // every cache that grows per query shape must be capped
-import { readFileSync } from 'node:fs';
 const wired = [
   ['src/api/routes/forecast.ts', 'summaryCache'],
   ['src/api/routes/actuals.ts', 'actualRangeCache'],
@@ -54,7 +54,7 @@ const wired = [
   ['src/api/services/overplanData.ts', 'detailQtyCache'],
 ];
 for (const [file, name] of wired) {
-  const source = readFileSync(file, 'utf8');
+  const source = readSource(file);
   assert.match(
     source,
     new RegExp(`pruneCache\\(\\s*${name}\\b`),

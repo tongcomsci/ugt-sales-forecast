@@ -10,9 +10,9 @@
  * Run: npx tsx scripts/verify-session-expiry.mjs
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from './readSource.mjs';
 
-const source = readFileSync('src/api/auth.ts', 'utf8');
+const source = readSource('src/api/auth.ts');
 
 // Every session write must go through storeSession, which stamps the expiry.
 // A bare sessions.set() elsewhere would create a session that never lapses.

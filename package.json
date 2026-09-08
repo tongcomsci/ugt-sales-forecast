@@ -12,6 +12,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test:mode": "tsx scripts/verify-query-mode.mjs",
+    "test": "npm run test:mode && tsx scripts/verify-forecast-granularity-key.mjs && tsx scripts/verify-bounded-cache.mjs && tsx scripts/verify-session-expiry.mjs",
     "server": "tsx src/server.ts",
     "start:prod": "node server.js",
     "seed": "tsx src/db/seed.ts",

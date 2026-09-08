@@ -9,6 +9,7 @@ import {
   type AppMode,
 } from '../config/appMode';
 import { resolveSessionPermissions } from './services/appRoles';
+import { dropExpired } from './services/boundedCache';
 
 export interface AuthUser {
   name: string;
@@ -38,8 +39,40 @@ interface SessionData {
 const SESSION_COOKIE = 'sf_session';
 const OAUTH_STATE_COOKIE = 'sf_oauth_state';
 const STATE_TTL_MS = 30 * 60 * 1000;
-const sessions = new Map<string, SessionData>();
+/**
+ * Server-side session lifetime. The cookie carries the same maxAge, but that is
+ * only enforced by the browser: without an expiry held here, a captured cookie
+ * value would stay valid forever and the map would never shrink.
+ */
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+const sessions = new Map<string, SessionData & { expiresAt: number }>();
 const authStates = new Map<string, AuthState>();
+
+/** Store a freshly authenticated session and clear out any that have lapsed. */
+function storeSession(sessionId: string, session: SessionData) {
+  dropExpired(sessions);
+  sessions.set(sessionId, { ...session, expiresAt: Date.now() + SESSION_TTL_MS });
+}
+
+/** Resolve a session id, treating a lapsed session as absent. */
+function readSession(sessionId: string | undefined): SessionData | null {
+  if (!sessionId) return null;
+  const entry = sessions.get(sessionId);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    sessions.delete(sessionId);
+    return null;
+  }
+  return entry;
+}
+
+/** Abandoned login attempts are never completed, so sweep them by age. */
+function sweepAuthStates() {
+  const cutoff = Date.now() - STATE_TTL_MS;
+  for (const [key, state] of authStates) {
+    if (state.createdAt <= cutoff) authStates.delete(key);
+  }
+}
 
 class AuthHttpError extends Error {
   constructor(message: string, public status?: number) {
@@ -104,7 +137,8 @@ function setSessionCookie(res: Response, sessionId: string) {
     sameSite: 'lax',
     secure,
     path: basePath || '/',
-    maxAge: 8 * 60 * 60 * 1000,
+    // Same lifetime the server enforces, so the two cannot drift apart.
+    maxAge: SESSION_TTL_MS,
   });
 }
 
@@ -239,13 +273,13 @@ function clearOAuthStateCookie(res: Response) {
 function getUserFromRequest(req: Request): AuthUser | null {
   if (isDevAuthBypass()) return getDevUser();
   const sessionId = parseCookies(req.headers.cookie).get(SESSION_COOKIE);
-  return sessionId ? sessions.get(sessionId)?.user ?? null : null;
+  return readSession(sessionId)?.user ?? null;
 }
 
 function getSessionFromRequest(req: Request): SessionData | null {
   if (isDevAuthBypass()) return { user: getDevUser() };
   const sessionId = parseCookies(req.headers.cookie).get(SESSION_COOKIE);
-  return sessionId ? sessions.get(sessionId) ?? null : null;
+  return readSession(sessionId);
 }
 
 function base64UrlDecode(value: string) {
@@ -796,7 +830,7 @@ export function createAuthRouter() {
     const returnMode = resolveReturnMode(req);
     if (isDevAuthBypass()) {
       const sessionId = crypto.randomUUID();
-      sessions.set(sessionId, { user: getDevUser() });
+      storeSession(sessionId, { user: getDevUser() });
       setSessionCookie(res, sessionId);
       return res.redirect(getAbsoluteAppUrl(req, returnMode));
     }
@@ -813,6 +847,7 @@ export function createAuthRouter() {
         returnMode,
       };
       const state = encodeAuthStateToken(authState);
+      sweepAuthStates();
       authStates.set(state, authState);
       setOAuthStateCookie(res, state, authState);
       const redirectUri = getCallbackUrl(req);
@@ -852,7 +887,7 @@ export function createAuthRouter() {
       const redirectUri = getCallbackUrl(req);
       const session = await exchangeCodeForSession(code, redirectUri, savedState.codeVerifier, metadata);
       const sessionId = crypto.randomUUID();
-      sessions.set(sessionId, session);
+      storeSession(sessionId, session);
       setSessionCookie(res, sessionId);
       const returnMode: AppMode = savedState.returnMode === 'ufa' ? 'ufa' : 'nyl';
       res.redirect(getAbsoluteAppUrl(req, returnMode));

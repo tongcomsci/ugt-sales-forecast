@@ -49,7 +49,7 @@ async function seed() {
       create: c,
     });
     await prisma.$executeRaw`
-      MERGE [dbo].[price_management_values] AS target
+      MERGE [dbo].[price_management_values] WITH (HOLDLOCK) AS target
       USING (SELECT ${c.month} AS [month], N'Fcst' AS [priceType], N'Current Forecast' AS [versionName]) AS source
       ON target.[month] = source.[month]
         AND target.[priceType] = source.[priceType]

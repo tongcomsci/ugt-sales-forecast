@@ -467,7 +467,7 @@ export async function confirmLegacyImport(
       },
     });
     await transaction.$executeRaw`
-      MERGE [dbo].[forecast_values] AS target
+      MERGE [dbo].[forecast_values] WITH (HOLDLOCK) AS target
       USING (
         SELECT registrationId, period, qtyFcst, priceFcst, amountFcst, changed
         FROM OPENJSON(${mergePayload})
@@ -483,9 +483,9 @@ export async function confirmLegacyImport(
       ON target.registrationId = source.registrationId
         AND target.versionName = ${CURRENT_FORECAST_VERSION}
         AND target.period = source.period
+        AND target.granularity = 'week'
       WHEN MATCHED THEN
         UPDATE SET
-          target.granularity = 'week',
           target.qtyFcst = source.qtyFcst,
           target.priceFcst = CASE WHEN ${updatePrice} = 1 THEN source.priceFcst ELSE target.priceFcst END,
           target.amountFcst = CASE WHEN ${updateAmount} = 1 THEN source.amountFcst ELSE target.amountFcst END,
@@ -647,7 +647,7 @@ export async function confirmVersionedImport(
       },
     });
     await transaction.$executeRaw`
-      MERGE [dbo].[forecast_values] AS target
+      MERGE [dbo].[forecast_values] WITH (HOLDLOCK) AS target
       USING (
         SELECT registrationId, period, qtyFcst, priceFcst, amountFcst, changed
         FROM OPENJSON(${mergePayload})
@@ -663,9 +663,9 @@ export async function confirmVersionedImport(
       ON target.registrationId = source.registrationId
         AND target.versionName = ${versionName}
         AND target.period = source.period
+        AND target.granularity = 'month'
       WHEN MATCHED THEN
         UPDATE SET
-          target.granularity = 'month',
           target.qtyFcst = source.qtyFcst,
           target.priceFcst = CASE WHEN ${updatePrice} = 1 THEN source.priceFcst ELSE target.priceFcst END,
           target.amountFcst = CASE WHEN ${updateAmount} = 1 THEN source.amountFcst ELSE target.amountFcst END,

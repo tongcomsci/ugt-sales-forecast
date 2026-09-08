@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import {
   buildAppModeRegistrationScopeSql,
@@ -7,16 +7,27 @@ import {
 } from '../../config/appMode';
 import prisma from '../../db/prisma';
 import { getRegistrationSourceSql } from './registrations';
+import { pruneCache } from '../services/boundedCache';
 
 const router = Router();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const QUERY_CACHE_TTL_MS = 60 * 1000;
-const INVENTORY_DATABASE_URL = process.env.INVENTORY_DATABASE_URL ??
-  'sqlserver://thrygsd002:1433;database=UBE_DW;user=dwuser;password=dwuser;encrypt=true;trustServerCertificate=true';
-const INVENTORY_VIEW = Prisma.raw(process.env.INVENTORY_VIEW_NAME ?? '[dbo].[MKT_NYL_Current_INV]');
-const inventoryPrisma = new PrismaClient({
-  datasources: { db: { url: INVENTORY_DATABASE_URL } },
-});
+const MAX_INVENTORY_QUERY_CACHE_ENTRIES = 32;
+function resolveInventoryViewName() {
+  // Read over the linked server on the main connection, same as
+  // HR_EMPLOYEE_VIEW / CUSTOMER_MASTER_VIEW.
+  const name = process.env.INVENTORY_VIEW_NAME ?? 'thrygsd002.UBE_DW.dbo.MKT_NYL_Current_INV';
+  // This value is interpolated straight into SQL, so accept only 2-4 dotted
+  // parts, each a bare or bracketed identifier.
+  if (!/^(\[[\w ]+\]|\w+)(\.(\[[\w ]+\]|\w+)){1,3}$/.test(name)) {
+    throw new Error(
+      `INVENTORY_VIEW_NAME must be a [server.][database.]schema.view identifier, got: ${name}`
+    );
+  }
+  return name;
+}
+
+const INVENTORY_VIEW = Prisma.raw(resolveInventoryViewName());
 
 interface InventoryApiRow {
   registrationId: string;
@@ -85,7 +96,7 @@ function mapInventoryRow(
 
 async function loadInventoryRows() {
   const registrationSource = await getRegistrationSourceSql();
-  const inventoryRows = await inventoryPrisma.$queryRaw<Array<Record<string, unknown>>>`
+  const inventoryRows = await prisma.$queryRaw<Array<Record<string, unknown>>>`
     WITH latest_inventory_date AS (
       SELECT MAX(CAST(inv.[Date] AS DATE)) AS inventoryDate
       FROM ${INVENTORY_VIEW} inv
@@ -183,7 +194,7 @@ async function loadInventoryRowsForRegistrationIds(registrationIds: string[]) {
     return registrations.map(row => mapInventoryRow(row));
   }
 
-  const inventoryRows = await inventoryPrisma.$queryRaw<Array<Record<string, unknown>>>`
+  const inventoryRows = await prisma.$queryRaw<Array<Record<string, unknown>>>`
     WITH latest_inventory_date AS (
       SELECT MAX(CAST(inv.[Date] AS DATE)) AS inventoryDate
       FROM ${INVENTORY_VIEW} inv
@@ -252,6 +263,7 @@ router.post('/query', async (req, res) => {
       }),
     };
     inventoryQueryCache.set(cacheKey, cached);
+    pruneCache(inventoryQueryCache, MAX_INVENTORY_QUERY_CACHE_ENTRIES);
   }
 
   try {

@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import prisma from '../../db/prisma';
 import type { AuthUser } from '../auth';
 import { ensureHrEmployeeCache, NYLON_COST_CENTER } from './employeeEmail';
+import { pruneCache } from './boundedCache';
 
 export type AppRole = 'admin' | 'super_user' | 'user';
 
@@ -29,6 +30,7 @@ const DEFAULT_ADMIN_NAMES = [
 ];
 
 const PERMISSIONS_CACHE_TTL_MS = 60_000;
+const MAX_PERMISSIONS_CACHE_ENTRIES = 512;
 const permissionsCache = new Map<string, { expiresAt: number; value: SessionPermissions }>();
 
 function isDevAuthBypass() {
@@ -215,6 +217,7 @@ export async function resolveSessionPermissions(user: AuthUser): Promise<Session
 
   const value = permissionsFromRole(role, empCode);
   permissionsCache.set(cacheKey, { value, expiresAt: Date.now() + PERMISSIONS_CACHE_TTL_MS });
+  pruneCache(permissionsCache, MAX_PERMISSIONS_CACHE_ENTRIES);
   return value;
 }
 

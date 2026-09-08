@@ -1419,7 +1419,38 @@ function ImportValidationIssues({
     skippedKeyGroups.length > 0 ||
     crossSheetDuplicateKeys.length > 0;
 
-  if (!hasIssues) return null;
+  if (!hasIssues) {
+    // ponytail: defense-in-depth — summary cards and these tables read the same arrays,
+    // so a non-zero summary count with an empty detail array means the response was
+    // truncated/stale rather than "no issues". Surface it instead of rendering nothing.
+    const summary = preview.summary;
+    const counts: Array<[string, number | undefined, number]> = [
+      ['headerErrors', summary?.headerErrors, headerErrors.length],
+      ['invalidNumericValues', summary?.invalidNumericValues, invalidNumericValues.length],
+      ['duplicateRegistrationMatches', summary?.duplicateRegistrationMatches, duplicateRegistrationMatches.length],
+      ['missingKeyRows', summary?.missingKeyRows, missingKeyRows.length],
+      ['skippedKeyGroups', summary?.skippedKeyGroups, skippedKeyGroups.length],
+      ['crossSheetDuplicateKeys', summary?.crossSheetDuplicateKeys, crossSheetDuplicateKeys.length],
+    ];
+    const mismatches = counts.filter(([, count, arrLength]) => (count ?? 0) > 0 && arrLength === 0);
+
+    if (mismatches.length > 0) {
+      console.error('[import-preview] summary/detail mismatch — detail arrays missing:', mismatches);
+      return (
+        <div className="flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 shadow-sm">
+          <ShieldAlert size={18} className="mt-0.5 shrink-0 text-red-600" />
+          <div className="text-sm text-red-900">
+            <p className="font-semibold">Preview summary and detail data disagree</p>
+            <p className="mt-1 text-red-800/90">
+              Summary cards report issues but the detail tables came back empty — the response is likely
+              stale or truncated. Click "Re-run Preview"; if it happens again, restart the API server.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">

@@ -7,6 +7,7 @@ import {
 } from '../../config/appMode';
 import prisma from '../../db/prisma';
 import { getActiveSnapshotVersion } from '../services/dataSnapshot';
+import { pruneCache } from '../services/boundedCache';
 
 const router = Router();
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -139,6 +140,7 @@ function matchesActualOnlyFilters(
   });
 }
 
+const MAX_ACTUAL_CACHE_ENTRIES = 64;
 const actualRangeCache = new Map<
   string,
   { expiresAt: number; promise: Promise<ActualApiRow[]> }
@@ -511,6 +513,7 @@ async function getCachedActualRange(
     throw error;
   });
   actualRangeCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, promise });
+  pruneCache(actualRangeCache, MAX_ACTUAL_CACHE_ENTRIES);
   return promise;
 }
 
@@ -531,6 +534,7 @@ export async function getCachedScopedActualRange(
     throw error;
   });
   scopedActualCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, promise });
+  pruneCache(scopedActualCache, MAX_ACTUAL_CACHE_ENTRIES);
   return promise;
 }
 

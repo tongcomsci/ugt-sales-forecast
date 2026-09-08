@@ -18,6 +18,7 @@ import { normalizeRegistrationFilters } from './registrations';
 import { sendOverplanNotificationEmails } from '../services/overplanNotification';
 import { buildOverplanNotificationPreviews } from '../services/notificationPreview';
 import { resolveComparePair } from '../services/overplanCompare';
+import { pruneCache } from '../services/boundedCache';
 
 const router = Router();
 const CACHE_TTL_MS = 30 * 60 * 1000;
@@ -35,6 +36,7 @@ let warmupPromise: Promise<void> | null = null;
 
 type EvaluateView = 'aggregate' | 'detail';
 
+const MAX_EVALUATION_CACHE_ENTRIES = 32;
 const evaluationCoreCache = new Map<
   string,
   { expiresAt: number; promise: Promise<OverplanEvaluationCore> }
@@ -464,6 +466,7 @@ async function getEvaluationCore(
     expiresAt: Date.now() + CACHE_TTL_MS,
     promise,
   });
+  pruneCache(evaluationCoreCache, MAX_EVALUATION_CACHE_ENTRIES);
   return promise;
 }
 

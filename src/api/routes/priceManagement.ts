@@ -171,7 +171,7 @@ router.patch('/bulk', async (req, res) => {
         const cplTecnonPrice = numberOrZero(row.cplTecnonPrice);
         const cplPciPrice = numberOrZero(row.cplPciPrice);
         await tx.$executeRaw`
-          MERGE [dbo].[price_management_values] AS target
+          MERGE [dbo].[price_management_values] WITH (HOLDLOCK) AS target
           USING (SELECT ${month} AS [month], ${priceType} AS [priceType], ${versionName} AS [versionName]) AS source
           ON target.[month] = source.[month]
             AND target.[priceType] = source.[priceType]
@@ -221,7 +221,7 @@ router.post('/copy', async (req, res) => {
     await prisma.$transaction(async tx => {
       for (const row of sourceRows) {
         await tx.$executeRaw`
-          MERGE [dbo].[price_management_values] AS target
+          MERGE [dbo].[price_management_values] WITH (HOLDLOCK) AS target
           USING (SELECT ${row.month} AS [month], N'Fcst' AS [priceType], ${targetVersion} AS [versionName]) AS source
           ON target.[month] = source.[month]
             AND target.[priceType] = source.[priceType]

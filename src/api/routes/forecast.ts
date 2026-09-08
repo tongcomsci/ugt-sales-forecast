@@ -35,6 +35,8 @@ import {
   buildForecastChangeBatches,
   sampleForecastChangePreview,
 } from '../services/notificationPreview';
+import { pruneCache } from '../services/boundedCache';
+import { chunkArray } from '../services/forecastImport/excelUtils';
 
 const router = Router();
 const SUMMARY_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -84,6 +86,11 @@ interface NormalizedForecastUpdate {
   amountFcst: number;
 }
 
+const MAX_SUMMARY_CACHE_ENTRIES = 64;
+// Three query parameters per cell, against SQL Server's 2100-parameter cap.
+const EXISTING_LOOKUP_CHUNK_SIZE = 300;
+// Far above any real paste, but keeps one request from pinning the server.
+const MAX_UPDATES_PER_REQUEST = 20_000;
 const summaryCache = new Map<
   string,
   { expiresAt: number; promise: Promise<ForecastSummaryResponse> }
@@ -719,6 +726,7 @@ router.post('/summary', async (req, res) => {
     expiresAt: Date.now() + SUMMARY_CACHE_TTL_MS,
     promise,
   });
+  pruneCache(summaryCache, MAX_SUMMARY_CACHE_ENTRIES);
 
   try {
     res.json(await promise);
@@ -1051,6 +1059,12 @@ router.patch('/', async (req, res) => {
       return res.status(400).json({ error: 'Forecast amount cannot be negative.' });
     }
   }
+  if (updates.length > MAX_UPDATES_PER_REQUEST) {
+    return res.status(413).json({
+      error: `Too many forecast values in one request (${updates.length}). ` +
+        `Save at most ${MAX_UPDATES_PER_REQUEST} at a time.`,
+    });
+  }
   const normalizedUpdates = normalizeForecastUpdates(updates);
   if (normalizedUpdates.length === 0) {
     return res.status(400).json({ error: 'No valid forecast values were supplied' });
@@ -1068,24 +1082,38 @@ router.patch('/', async (req, res) => {
           STANDARD_VERSION_KEYS[versionName] !== undefined
         );
       }
-      const existingRows = await transaction.forecastValue.findMany({
-        where: {
-          OR: normalizedUpdates.map(update => ({
-            registrationId: update.registrationId,
-            versionName: update.versionName,
-            period: update.period,
-          })),
-        },
-        select: {
-          registrationId: true,
-          versionName: true,
-          period: true,
-          granularity: true,
-          qtyFcst: true,
-          priceFcst: true,
-          amountFcst: true,
-        },
-      });
+      // One OR clause per cell costs three query parameters, and SQL Server
+      // caps a statement at 2100, so a large grid save has to be chunked.
+      const existingRows: Array<{
+        registrationId: string;
+        versionName: string;
+        period: Date;
+        granularity: string;
+        qtyFcst: Prisma.Decimal;
+        priceFcst: Prisma.Decimal;
+        amountFcst: Prisma.Decimal;
+      }> = [];
+      for (const chunk of chunkArray(normalizedUpdates, EXISTING_LOOKUP_CHUNK_SIZE)) {
+        const chunkRows = await transaction.forecastValue.findMany({
+          where: {
+            OR: chunk.map(update => ({
+              registrationId: update.registrationId,
+              versionName: update.versionName,
+              period: update.period,
+            })),
+          },
+          select: {
+            registrationId: true,
+            versionName: true,
+            period: true,
+            granularity: true,
+            qtyFcst: true,
+            priceFcst: true,
+            amountFcst: true,
+          },
+        });
+        existingRows.push(...chunkRows);
+      }
       const existingMap = new Map(
         existingRows.map(row => [
           `${row.registrationId}|${row.versionName}|${formatForecastPeriodForApi(row.period, row.granularity)}`,
@@ -1127,7 +1155,7 @@ router.patch('/', async (req, res) => {
       }));
       const mergeJson = JSON.stringify(mergePayload);
       await transaction.$executeRaw`
-        MERGE [dbo].[forecast_values] AS target
+        MERGE [dbo].[forecast_values] WITH (HOLDLOCK) AS target
         USING (
           SELECT
             [registrationId], [versionName], [period], [granularity],
@@ -1147,9 +1175,9 @@ router.patch('/', async (req, res) => {
         ON target.[registrationId] = source.[registrationId]
           AND target.[versionName] = source.[versionName]
           AND target.[period] = source.[period]
+          AND target.[granularity] = source.[granularity]
         WHEN MATCHED THEN
           UPDATE SET
-            target.[granularity] = source.[granularity],
             target.[qtyFcst] = source.[qtyFcst],
             target.[priceFcst] = source.[priceFcst],
             target.[amountFcst] = source.[amountFcst],
@@ -1193,7 +1221,7 @@ router.patch('/', async (req, res) => {
           };
         }),
       };
-    });
+    }, { timeout: 120_000 });
     clearForecastSummaryCache();
 
     if (result.notificationChanges.length > 0) {

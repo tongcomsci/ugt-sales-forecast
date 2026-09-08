@@ -8,3 +8,6 @@ dc-report/
 server.js
 .env*
 !.env.example
+
+# Claude Code session logs (local only)
+.claude/logs/

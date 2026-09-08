@@ -14,6 +14,7 @@ import {
 } from '../routes/registrations';
 import { getActiveSnapshotVersion } from './dataSnapshot';
 import { OVERPLAN_ACTUAL_SOURCE } from './overplanCompare';
+import { pruneCache } from './boundedCache';
 
 const DETAIL_QTY_CACHE_TTL_MS = 30 * 60 * 1000;
 const MAX_DETAIL_QTY_CACHE_ENTRIES = 24;
@@ -128,16 +129,7 @@ export async function getOverplanCompareDataStamp(compareLeft: string, compareRi
 }
 
 function pruneDetailQtyCache(): void {
-  if (detailQtyCache.size <= MAX_DETAIL_QTY_CACHE_ENTRIES) return;
-  const now = Date.now();
-  for (const [key, entry] of detailQtyCache) {
-    if (entry.expiresAt <= now) detailQtyCache.delete(key);
-  }
-  while (detailQtyCache.size > MAX_DETAIL_QTY_CACHE_ENTRIES) {
-    const oldest = detailQtyCache.keys().next().value;
-    if (oldest === undefined) break;
-    detailQtyCache.delete(oldest);
-  }
+  pruneCache(detailQtyCache, MAX_DETAIL_QTY_CACHE_ENTRIES);
 }
 
 export async function loadOverplanRegistrationMeta(registrationIds: string[]) {

@@ -81,7 +81,7 @@ export async function syncCplActualPrices(): Promise<CplActualSyncResult> {
           if (!/^\d{4}-\d{2}$/.test(month)) continue;
           const cplPrice = roundPrice(row.cplPrice);
           await tx.$executeRaw`
-            MERGE [dbo].[price_management_values] AS target
+            MERGE [dbo].[price_management_values] WITH (HOLDLOCK) AS target
             USING (
               SELECT ${month} AS [month], ${PRICE_TYPE} AS [priceType], ${VERSION_NAME} AS [versionName]
             ) AS source

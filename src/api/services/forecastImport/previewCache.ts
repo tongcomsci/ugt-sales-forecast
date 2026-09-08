@@ -8,6 +8,7 @@ import type {
   VersionedNormalizedImportRecord,
 } from './types';
 import { PREVIEW_CACHE_TTL_MS } from './constants';
+import { pruneCache } from '../boundedCache';
 
 export type CachedPreviewPayload = {
   previewId: string;
@@ -29,6 +30,7 @@ export type CachedPreviewPayload = {
 };
 
 const cache = new Map<string, CachedPreviewPayload>();
+const MAX_PREVIEW_CACHE_ENTRIES = 16;
 
 export function storePreviewCache(
   payload: Omit<CachedPreviewPayload, 'previewId' | 'expiresAt' | 'appMode'> & { appMode?: AppMode }
@@ -41,6 +43,7 @@ export function storePreviewCache(
     expiresAt: Date.now() + PREVIEW_CACHE_TTL_MS,
   };
   cache.set(previewId, entry);
+  pruneCache(cache, MAX_PREVIEW_CACHE_ENTRIES);
   return entry;
 }
 

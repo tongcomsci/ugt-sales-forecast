@@ -40,7 +40,10 @@ model ForecastValue {
 
   version        ForecastVersion @relation(fields: [versionName], references: [name])
 
-  @@id([registrationId, versionName, period])
+  // granularity is part of the identity: a monthly row sits on the 1st and a
+  // weekly row on the first Wednesday, which is the same date when the 1st is a
+  // Wednesday. Without it one silently overwrites the other.
+  @@id([registrationId, versionName, period, granularity])
   @@map("forecast_values")
 }
 

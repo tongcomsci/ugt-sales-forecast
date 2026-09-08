@@ -102,7 +102,7 @@ export async function upsertRegistrationPriceSettings(
   const nextPolicy = hasPolicy ? pricingPolicy ?? null : existing?.pricingPolicy ?? null;
 
   await prisma.$executeRaw`
-    MERGE [dbo].[registration_price_settings] AS target
+    MERGE [dbo].[registration_price_settings] WITH (HOLDLOCK) AS target
     USING (
       SELECT
         ${id} AS registrationId,

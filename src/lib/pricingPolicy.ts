@@ -229,3 +229,22 @@ export function computePolicyPrice(
 export function isKnownPricingPolicy(value: unknown): boolean {
   return normalizePricingPolicy(value) !== null;
 }
+
+/**
+ * True when a registration names a pricing policy this module does not
+ * implement — the price then comes from the upload or from manual entry, and
+ * must not be calculated.
+ *
+ * Several policies in use (CPL Cost-Q, T-NaphthaH, PCI PA6 H/Q, FixEURO, Spot,
+ * …) average a different number of months per customer, so no single formula
+ * fits them. Until each is specified, computing anything here would produce a
+ * plausible but wrong price, which is harder to notice than a missing one.
+ *
+ * An empty policy is not "manual": those registrations legitimately fall
+ * through to the priceFormula chain.
+ */
+export function isManualPricePolicy(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (String(value).trim() === '') return false;
+  return normalizePricingPolicy(value) === null;
+}

@@ -7,6 +7,7 @@ import {
 import {
   computePolicyPrice,
   isCostPlus5Spread,
+  isManualPricePolicy,
   normalizePricingPolicy,
   resolvePricingSourceMonths,
   type PolymerPricingPolicy,
@@ -297,6 +298,10 @@ export function getForecastCellValue(
   const isPolymer = String(reg.businessUnit ?? '').toLowerCase() === 'polymer';
   const isPolicyDriven =
     isPolymer && (isCostPlus5Spread(spreadText) || policy !== null);
+  // A named policy with no formula behind it is priced by upload or by hand.
+  // Cost+5% still wins: that rule is driven by the spread, not the policy.
+  const usesManualPrice =
+    isPolymer && !isCostPlus5Spread(spreadText) && isManualPricePolicy(policyRaw);
 
   let priceFcst: number;
   const resolvedFormula = formula ?? 'CPL';
@@ -306,6 +311,10 @@ export function getForecastCellValue(
   } else if (storedRowPrice != null) {
     // Imported / stored price takes precedence over live policy calculation.
     priceFcst = storedRowPrice;
+  } else if (usesManualPrice) {
+    // Nothing uploaded or keyed in yet. Leave it empty rather than inventing a
+    // number from a formula that does not apply to this customer.
+    priceFcst = 0;
   } else if (isPolicyDriven) {
     const sourceMonths = resolvePricingSourceMonths(policy as PolymerPricingPolicy | null, pricingMonth);
     const primaryMonth = sourceMonths[0] ?? pricingMonth;

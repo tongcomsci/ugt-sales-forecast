@@ -23,11 +23,21 @@ export type RoleAssignmentDto = {
   assignedAt: string;
 };
 
-const DEFAULT_ADMIN_NAMES = [
-  'Supachai Sumeteenarumit',
-  'Wittavin Ploysopon',
-  'Pakorn Worakarn',
-];
+/**
+ * HR employee codes of the built-in administrators.
+ *
+ * Codes rather than names: a display name is not unique, and the one on the
+ * session arrives from Keycloak unverified, so matching on it would grant admin
+ * to anyone able to set their own name to match. An employee code comes from HR
+ * and identifies exactly one person.
+ *
+ * 91207 Supachai Sumeteenarumit, 91008 Wittavin Ploysopon, 91226 Pakorn Worakarn
+ */
+const DEFAULT_ADMIN_EMP_CODES = new Set([
+  '91207',
+  '91008',
+  '91226',
+]);
 
 const PERMISSIONS_CACHE_TTL_MS = 60_000;
 const MAX_PERMISSIONS_CACHE_ENTRIES = 512;
@@ -44,10 +54,6 @@ function normalizeKey(value: string) {
 function normalizePersonName(value: string) {
   return normalizeKey(value).split(/\s+/).join(' ');
 }
-
-const NORMALIZED_DEFAULT_ADMIN_NAMES = new Set(
-  DEFAULT_ADMIN_NAMES.map(name => normalizePersonName(name))
-);
 
 function permissionsFromRole(role: AppRole, empCode: string | null): SessionPermissions {
   return {
@@ -80,11 +86,9 @@ function isDevSessionUser(user: AuthUser) {
   return email === 'dev.local' || name === 'user (dev)';
 }
 
-function isDefaultAdminIdentity(identity: HrIdentity | null, user: AuthUser) {
-  if (identity && NORMALIZED_DEFAULT_ADMIN_NAMES.has(normalizePersonName(identity.fullNameEng))) {
-    return true;
-  }
-  return NORMALIZED_DEFAULT_ADMIN_NAMES.has(normalizePersonName(user.name));
+function isDefaultAdminIdentity(identity: HrIdentity | null) {
+  if (identity === null) return false;
+  return DEFAULT_ADMIN_EMP_CODES.has(identity.empCode.trim());
 }
 
 async function ensureDefaultAdminRow(identity: HrIdentity) {
@@ -122,7 +126,7 @@ function scoreHrIdentity(row: HrIdentity, input: {
     if (rowLogin === key) score += 70;
     if (rowName === normalizePersonName(key)) score += 60;
   }
-  if (NORMALIZED_DEFAULT_ADMIN_NAMES.has(rowName)) score += 10;
+  if (DEFAULT_ADMIN_EMP_CODES.has(row.empCode.trim())) score += 10;
   return score;
 }
 
@@ -200,9 +204,9 @@ export async function resolveSessionPermissions(user: AuthUser): Promise<Session
   let role: AppRole = 'user';
   let empCode: string | null = identity?.empCode ?? null;
 
-  if (isDefaultAdminIdentity(identity, user)) {
+  if (isDefaultAdminIdentity(identity)) {
     role = 'admin';
-    if (identity) await ensureDefaultAdminRow(identity);
+    await ensureDefaultAdminRow(identity!);
   } else if (identity?.empCode) {
     role = await lookupRoleByEmpCode(identity.empCode);
   }
@@ -238,9 +242,7 @@ export async function ensureRoleDefaults(): Promise<void> {
 
     for (const employee of hrEmployees) {
       if (assigned.has(employee.empCode)) continue;
-      const normalizedName = normalizePersonName(employee.fullNameEng);
-      const isDefaultAdmin = NORMALIZED_DEFAULT_ADMIN_NAMES.has(normalizedName);
-      if (!isDefaultAdmin) continue;
+      if (!DEFAULT_ADMIN_EMP_CODES.has(employee.empCode.trim())) continue;
       await prisma.appUserRole.create({
         data: {
           empCode: employee.empCode,

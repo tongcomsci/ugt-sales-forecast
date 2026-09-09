@@ -14,6 +14,12 @@ export const PREVIEW_IMPORTABLE_SAMPLE_SIZE = 50;
 export const PREVIEW_UNIFIED_ROWS_SAMPLE_SIZE = 100;
 export const PREVIEW_UNMATCHED_ROWS_SAMPLE_SIZE = 100;
 export const PREVIEW_OVERWRITE_SAMPLE_SIZE = 50;
+/**
+ * Cap for the validation-issue lists. A badly formed workbook can produce one
+ * entry per row, and the summary keeps the true counts, so the detail lists
+ * only ever need to be a readable sample.
+ */
+export const PREVIEW_ISSUE_SAMPLE_SIZE = 100;
 
 export const ALLOWED_STAMP_PERIODS = new Set([
   DEFAULT_STAMP_PERIOD,

@@ -7,7 +7,8 @@ import {
 import type { CurrentForecastImportPreview } from '../../../lib/api';
 import { businessUnitFromPlantCode } from '../businessUnit';
 import { isKnownPricingPolicy } from '../../../lib/pricingPolicy';
-import { CURRENT_FORECAST_VERSION, LEGACY_PREVIEW_CONTRACT_VERSION, PREVIEW_IMPORTABLE_SAMPLE_SIZE, PREVIEW_OVERWRITE_SAMPLE_SIZE, PREVIEW_UNIFIED_ROWS_SAMPLE_SIZE, PREVIEW_UNMATCHED_ROWS_SAMPLE_SIZE } from './constants';
+import { CURRENT_FORECAST_VERSION, LEGACY_PREVIEW_CONTRACT_VERSION, PREVIEW_IMPORTABLE_SAMPLE_SIZE, PREVIEW_OVERWRITE_SAMPLE_SIZE,
+  PREVIEW_ISSUE_SAMPLE_SIZE, PREVIEW_UNIFIED_ROWS_SAMPLE_SIZE, PREVIEW_UNMATCHED_ROWS_SAMPLE_SIZE } from './constants';
 import { getOnOffFromKey, primarySourceEntry, unknownToDisplayString } from './excelUtils';
 import {
   mergeLegacySheetResults,
@@ -467,14 +468,14 @@ export async function buildLegacyImportPreview(workbook: XLSX.WorkBook): Promise
     },
     expectedForecastColumns: forecastColumns,
     detectedHeaders,
-    headerErrors,
-    missingKeyRows,
-    duplicateExcelKeys,
-    crossSheetDuplicateKeys,
-    skippedKeyGroups,
+    headerErrors: headerErrors.slice(0, PREVIEW_ISSUE_SAMPLE_SIZE),
+    missingKeyRows: missingKeyRows.slice(0, PREVIEW_ISSUE_SAMPLE_SIZE),
+    duplicateExcelKeys: duplicateExcelKeys.slice(0, PREVIEW_ISSUE_SAMPLE_SIZE),
+    crossSheetDuplicateKeys: crossSheetDuplicateKeys.slice(0, PREVIEW_ISSUE_SAMPLE_SIZE),
+    skippedKeyGroups: skippedKeyGroups.slice(0, PREVIEW_ISSUE_SAMPLE_SIZE),
     unmatchedRows: unmatchedRows.slice(0, PREVIEW_UNMATCHED_ROWS_SAMPLE_SIZE),
-    duplicateRegistrationMatches,
-    invalidNumericValues,
+    duplicateRegistrationMatches: duplicateRegistrationMatches.slice(0, PREVIEW_ISSUE_SAMPLE_SIZE),
+    invalidNumericValues: invalidNumericValues.slice(0, PREVIEW_ISSUE_SAMPLE_SIZE),
     existingDbConflicts: [],
     overwriteRecords: overwriteRecords.slice(0, PREVIEW_OVERWRITE_SAMPLE_SIZE),
     unifiedPreviewRows: unifiedPreviewRows.slice(0, PREVIEW_UNIFIED_ROWS_SAMPLE_SIZE),

@@ -56,7 +56,40 @@ assert.match(
   `prisma/schema.prisma: ForecastValue @@id must include granularity, got: ${idLine.trim()}`
 );
 
-// --- 3. the live primary key must match the model -------------------------
+// --- 3. a period must match its granularity, or be rejected ---------------
+// Silently rounding 2026-01-15 to the 1st, or handing back an Invalid Date for
+// junk, writes a wrong row instead of failing the request (audit item 12).
+const { parseForecastPeriodToDate } = await import('../src/lib/forecastPeriod.ts');
+
+const iso = (period, granularity) => {
+  const date = parseForecastPeriodToDate(period, granularity);
+  assert.ok(!Number.isNaN(date.getTime()), `${period}/${granularity} produced an Invalid Date`);
+  return date.toISOString().slice(0, 10);
+};
+
+// Shapes that are genuinely valid keep working.
+assert.equal(iso('2026-01', 'month'), '2026-01-01');
+// The importers build month periods as YYYY-MM-01, so that has to stay valid.
+assert.equal(iso('2026-01-01', 'month'), '2026-01-01');
+assert.equal(iso('2026-01-07', 'week'), '2026-01-07');
+
+// A day that is not the 1st is a caller mistake, not something to round away.
+assert.throws(
+  () => parseForecastPeriodToDate('2026-01-15', 'month'),
+  /2026-01-15/,
+  'a month period on a day other than the 1st must be rejected, not silently moved'
+);
+
+// Junk must never come back as an Invalid Date.
+for (const junk of ['hello', '', '2026', '2026-13-01']) {
+  assert.throws(
+    () => parseForecastPeriodToDate(junk, 'month'),
+    `parseForecastPeriodToDate(${JSON.stringify(junk)}, 'month') must throw rather than ` +
+    'return an Invalid Date'
+  );
+}
+
+// --- 4. the live primary key must match the model -------------------------
 const { default: prisma } = await import('../src/db/prisma.ts');
 let pkColumns;
 try {

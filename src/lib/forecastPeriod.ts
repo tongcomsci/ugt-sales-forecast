@@ -20,15 +20,37 @@ export function formatForecastPeriodForApi(date: Date, granularity: string): str
 }
 
 export function parseForecastPeriodToDate(period: string, granularity = 'month'): Date {
-  if (MONTH_KEY_RE.test(period) || granularity === 'month') {
+  if (MONTH_KEY_RE.test(period)) {
     const [y, m] = period.split('-').map(Number);
-    return new Date(Date.UTC(y, m - 1, 1));
+    return buildPeriodDate(period, y, m, 1);
   }
   if (DATE_KEY_RE.test(period)) {
     const [y, m, d] = period.split('-').map(Number);
-    return new Date(Date.UTC(y, m - 1, d));
+    // Importers build month periods as YYYY-MM-01, so that stays valid. Any
+    // other day means the caller mixed up the granularity: rounding it to the
+    // 1st would silently write the wrong row.
+    if (granularity === 'month' && d !== 1) {
+      throw new Error(
+        `Month period must be YYYY-MM or the first of the month, got: ${period}`
+      );
+    }
+    return buildPeriodDate(period, y, m, d);
   }
   throw new Error(`Invalid forecast period: ${period}`);
+}
+
+/** Reject impossible dates instead of handing back an Invalid Date. */
+function buildPeriodDate(period: string, year: number, month: number, day: number): Date {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    throw new Error(`Invalid forecast period: ${period}`);
+  }
+  return date;
 }
 
 export function monthKeyToFirstOfMonth(monthKey: string): Date {

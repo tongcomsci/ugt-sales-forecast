@@ -11,3 +11,6 @@ server.js
 
 # Claude Code session logs (local only)
 .claude/logs/
+
+# Data backups written by scripts/repair-* (business data, keep local)
+backups/

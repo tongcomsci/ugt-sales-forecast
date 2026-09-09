@@ -478,6 +478,26 @@ export async function buildLegacyImportPreview(workbook: XLSX.WorkBook): Promise
     invalidNumericValues: invalidNumericValues.slice(0, PREVIEW_ISSUE_SAMPLE_SIZE),
     existingDbConflicts: [],
     overwriteRecords: overwriteRecords.slice(0, PREVIEW_OVERWRITE_SAMPLE_SIZE),
+    // Forecast rows that do not exist yet, so the "N created" figure on the
+    // result can be traced back to the Excel rows that produced it.
+    createRecords: createRecords.slice(0, PREVIEW_OVERWRITE_SAMPLE_SIZE).map(record => ({
+      sourceRow: record.sourceRow,
+      excelKeyForNoRegist: record.excelKeyForNoRegist,
+      matchedRegistrationId: record.matchedRegistrationId,
+      period: record.period,
+      sourceMonthHeader: record.sourceMonthHeader,
+      newQtyFcst: record.qtyFcst,
+    })),
+    autoCreateRegistrations: autoCreateCandidates
+      .slice(0, PREVIEW_ISSUE_SAMPLE_SIZE)
+      .map(candidate => ({
+        excelKeyForNoRegist: candidate.excelKeyForNoRegist,
+        sourceSheet: candidate.sourceSheet,
+        sourceRow: candidate.sourceRow,
+        plantCode: candidate.plantCode,
+        materialCode: candidate.materialCode,
+        ownerName: candidate.ownerName,
+      })),
     unifiedPreviewRows: unifiedPreviewRows.slice(0, PREVIEW_UNIFIED_ROWS_SAMPLE_SIZE),
     importableRecords: importableRecords.slice(0, PREVIEW_IMPORTABLE_SAMPLE_SIZE).map(record => ({
       ...record,

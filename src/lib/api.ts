@@ -209,6 +209,28 @@ export interface CurrentForecastImportPreview {
     oldQtyFcst: number;
     newQtyFcst: number;
   }>;
+  /**
+   * Forecast rows that do not exist yet and will be added, so the "N created"
+   * figure on the result can be traced to the Excel rows and months behind it.
+   */
+  createRecords?: Array<{
+    sourceRow: number;
+    excelKeyForNoRegist: string;
+    matchedRegistrationId: string;
+    period: string;
+    sourceMonthHeader: string;
+    newQtyFcst: number;
+    newPriceFcst?: number;
+  }>;
+  /** Registrations with no CRM match, which confirming the import will create. */
+  autoCreateRegistrations?: Array<{
+    excelKeyForNoRegist: string;
+    sourceSheet: string;
+    sourceRow: number;
+    plantCode: string;
+    materialCode: string;
+    ownerName: string | null;
+  }>;
   unifiedPreviewRows: CurrentForecastUnifiedPreviewRow[];
   importableRecords: CurrentForecastImportRecord[];
 }

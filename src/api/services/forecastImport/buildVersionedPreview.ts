@@ -152,6 +152,29 @@ export type VersionedPreviewResult = {
     oldPriceFcst: number;
     newPriceFcst: number;
   }>;
+  /**
+   * Forecast rows that do not exist yet and will be added. Reported so the
+   * "N created" figure on the result can be traced back to the Excel rows and
+   * months that produced it, instead of only being a count.
+   */
+  createRecords: Array<{
+    sourceRow: number;
+    excelKeyForNoRegist: string;
+    matchedRegistrationId: string;
+    period: string;
+    sourceMonthHeader: string;
+    newQtyFcst: number;
+    newPriceFcst: number;
+  }>;
+  /** Registrations with no CRM match, which confirming the import will create. */
+  autoCreateRegistrations: Array<{
+    excelKeyForNoRegist: string;
+    sourceSheet: string;
+    sourceRow: number;
+    plantCode: string;
+    materialCode: string;
+    ownerName: string | null;
+  }>;
   amountMismatchWarnings: AmountMismatchWarning[];
   unifiedPreviewRows: UnifiedPreviewRow[];
   importableRecords: VersionedNormalizedImportRecord[];
@@ -668,6 +691,25 @@ export async function buildVersionedImportPreview(
     invalidNumericValues: invalidNumericValues.slice(0, PREVIEW_ISSUE_SAMPLE_SIZE),
     existingDbConflicts: [],
     overwriteRecords: overwriteRecords.slice(0, PREVIEW_OVERWRITE_SAMPLE_SIZE),
+    createRecords: createRecords.slice(0, PREVIEW_OVERWRITE_SAMPLE_SIZE).map(record => ({
+      sourceRow: record.sourceRow,
+      excelKeyForNoRegist: record.excelKeyForNoRegist,
+      matchedRegistrationId: record.matchedRegistrationId,
+      period: record.period,
+      sourceMonthHeader: record.sourceMonthHeader,
+      newQtyFcst: record.qtyFcst,
+      newPriceFcst: record.priceFcst,
+    })),
+    autoCreateRegistrations: autoCreateCandidates
+      .slice(0, PREVIEW_ISSUE_SAMPLE_SIZE)
+      .map(candidate => ({
+        excelKeyForNoRegist: candidate.excelKeyForNoRegist,
+        sourceSheet: candidate.sourceSheet,
+        sourceRow: candidate.sourceRow,
+        plantCode: candidate.plantCode,
+        materialCode: candidate.materialCode,
+        ownerName: candidate.ownerName,
+      })),
     amountMismatchWarnings: amountMismatchWarnings.slice(0, PREVIEW_UNMATCHED_ROWS_SAMPLE_SIZE),
     unifiedPreviewRows: unifiedPreviewRows.slice(0, PREVIEW_UNIFIED_ROWS_SAMPLE_SIZE),
     importableRecords: importableRecords.slice(0, PREVIEW_IMPORTABLE_SAMPLE_SIZE),

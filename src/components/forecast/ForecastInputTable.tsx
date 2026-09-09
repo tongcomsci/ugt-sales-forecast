@@ -1189,6 +1189,21 @@ function ImportPreviewModal({
                       `Row ${item.sourceRow} — ${item.sourceMonthHeader}: ${item.oldQtyFcst} → ${item.newQtyFcst}`
                     )}
                   />
+                  <PreviewList
+                    title={`Forecast Values to Create (${summary.createRecords ?? 0})`}
+                    emptyText="No new forecast values will be added"
+                    items={(preview.createRecords ?? []).slice(0, 8).map(item =>
+                      `Row ${item.sourceRow} — ${item.sourceMonthHeader}: ${item.newQtyFcst} · ${item.matchedRegistrationId}`
+                    )}
+                  />
+                  <PreviewList
+                    title={`Registrations to Create (${summary.registrationsToCreate ?? 0})`}
+                    emptyText="No registrations will be created"
+                    items={(preview.autoCreateRegistrations ?? []).map(item =>
+                      `${item.sourceSheet} row ${item.sourceRow} — plant ${item.plantCode} / material ${item.materialCode}` +
+                      `${item.ownerName ? ` · ${item.ownerName}` : ''} · ${item.excelKeyForNoRegist}`
+                    )}
+                  />
                 </div>
 
                 <PreviewDataPanel

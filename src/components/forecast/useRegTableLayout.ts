@@ -49,31 +49,50 @@ function loadStoredColumnLayout(appMode?: string | null): {
   }
 }
 
+function buildVisibility(
+  appMode?: 'nyl' | 'ufa' | null,
+  storedVisibility?: Partial<Record<RegColumnKey, boolean>>
+): Record<RegColumnKey, boolean> {
+  const visibility = DEFAULT_COLUMN_ORDER.reduce(
+    (acc, key) => ({ ...acc, [key]: false }),
+    {} as Record<RegColumnKey, boolean>
+  );
+  getDefaultVisibleColumnKeys(appMode).forEach(key => {
+    visibility[key] = true;
+  });
+  return { ...visibility, ...storedVisibility };
+}
+
 export function useRegTableLayout(appMode?: 'nyl' | 'ufa' | null) {
-  const stored = useMemo(() => loadStoredColumnLayout(appMode), [appMode]);
-  const [columnOrder, setColumnOrder] = useState<RegColumnKey[]>(stored.order ?? DEFAULT_COLUMN_ORDER);
+  const [columnOrder, setColumnOrder] = useState<RegColumnKey[]>(
+    () => loadStoredColumnLayout(appMode).order ?? DEFAULT_COLUMN_ORDER
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draggedColumnKey, setDraggedColumnKey] = useState<RegColumnKey | null>(null);
   const [columnVisibility, setColumnVisibility] = useState<Record<RegColumnKey, boolean>>(
-    () => {
-      const initialVisibility = DEFAULT_COLUMN_ORDER.reduce(
-        (acc, key) => ({ ...acc, [key]: false }),
-        {} as Record<RegColumnKey, boolean>
-      );
-      getDefaultVisibleColumnKeys(appMode).forEach(key => {
-        initialVisibility[key] = true;
-      });
-      return { ...initialVisibility, ...stored.visibility };
-    }
+    () => buildVisibility(appMode, loadStoredColumnLayout(appMode).visibility)
   );
+  // Which app mode the layout above was loaded for. `appMode` is null on the first render
+  // (it comes from an async /app-config fetch), so the layout has to be re-read once the
+  // real mode arrives -- and must not be written back under the new key before that, or
+  // the save effect overwrites the user's saved layout with defaults on every page load.
+  const [layoutMode, setLayoutMode] = useState(appMode);
 
   useEffect(() => {
-    if (globalThis.localStorage === undefined) return;
+    if (layoutMode === appMode) return;
+    const reloaded = loadStoredColumnLayout(appMode);
+    setColumnOrder(reloaded.order ?? DEFAULT_COLUMN_ORDER);
+    setColumnVisibility(buildVisibility(appMode, reloaded.visibility));
+    setLayoutMode(appMode);
+  }, [appMode, layoutMode]);
+
+  useEffect(() => {
+    if (globalThis.localStorage === undefined || layoutMode !== appMode) return;
     globalThis.localStorage.setItem(
       columnLayoutStorageKey(appMode),
       JSON.stringify({ order: columnOrder, visibility: columnVisibility })
     );
-  }, [appMode, columnOrder, columnVisibility]);
+  }, [appMode, layoutMode, columnOrder, columnVisibility]);
 
   useEffect(() => {
     if (appMode !== 'ufa') return;
